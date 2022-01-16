@@ -3,10 +3,13 @@ package main
 import (
 	"flag"
 	"fmt"
+	"github.com/Crow314/dis-communication-gateway/pkg/gateway"
 	"github.com/Crow314/dis-communication-repeater/pkg/repeater"
 	"github.com/Crow314/im920s-controller/pkg/connector"
 	"github.com/Crow314/im920s-controller/pkg/module"
+	"log"
 	"os"
+	"strconv"
 )
 
 func main() {
@@ -29,9 +32,17 @@ Options
 
 	flag.Parse()
 	tty := flag.Args()[0]
+	addr, err := strconv.ParseInt(flag.Args()[1], 10, 8)
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	conn := connector.NewConnector(tty)
 	im920s := module.NewIm920s(conn.TransmitChannel(), conn.ReceiveChannel())
 
-	repeater.Run(im920s, *storeSize, *times, *interval, nil)
+	dataChan := make(chan module.ReceivedData)
+	gateway.ServiceURL = map[byte]string{1: "http://localhost:3000/evacuees/register"} // TODO config
+
+	go repeater.Run(im920s, *storeSize, *times, *interval, dataChan)
+	gateway.Run(im920s, dataChan, byte(addr), *times, *interval)
 }
